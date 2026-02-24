@@ -1,16 +1,20 @@
-FROM php:8.2-apache
+FROM php:8.2-fpm as php
 
-# Instalar extensiones necesarias para MySQL
+# Instalar extensiones necesarias
 RUN docker-php-ext-install pdo pdo_mysql
 
-# Copiar aplicación
 COPY ./app /var/www/html/
-
-# Permisos correctos
 RUN chown -R www-data:www-data /var/www/html
-RUN chmod -R 755 /var/www/html
 
-# Exponer puerto 80
+# Nginx
+FROM nginx:alpine
+
+# Copiar configuración de Nginx
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Copiar app desde la etapa PHP
+COPY --from=php /var/www/html /var/www/html
+
 EXPOSE 80
 
-CMD ["apache2-foreground"]
+CMD ["nginx", "-g", "daemon off;"]
