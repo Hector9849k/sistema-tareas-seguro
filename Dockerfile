@@ -11,14 +11,18 @@ RUN apk add --no-cache \
 # Instalar extensión PDO MySQL
 RUN docker-php-ext-install pdo pdo_mysql
 
-# Establecer directorio raíz web
-WORKDIR /var/www/html
+# Crear directorio raíz web
+RUN mkdir -p /var/www/html
 
-# Copiar TODOS los archivos del proyecto a /var/www/html
-COPY . /var/www/html/
+# Copiar SOLO la carpeta app al directorio raíz de Nginx
+COPY app /var/www/html
+
+# Copiar nginx.conf
+COPY nginx.conf /etc/nginx/http.d/default.conf
 
 # Permisos
-RUN chown -R www-data:www-data /var/www/html
+RUN chown -R www-data:www-data /var/www/html && \
+    chmod -R 755 /var/www/html
 
 # Crear directorio para logs
 RUN mkdir -p /var/log/nginx
