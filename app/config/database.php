@@ -1,17 +1,9 @@
+
 <?php
-/**
- * =================================================================
- * PROBLEMA 3 - DISEÑO INSEGURO: SOLUCIONADO ✅
- * =================================================================
- * Implementación de clase Database con patrón Singleton
- * Previene múltiples conexiones y asegura configuración única
- * =================================================================
- */
 class Database {
     private static $instance = null;
     private $conn;
     
-    // Configuración con variables de entorno (Railway/Producción)
     private $host;
     private $port;
     private $db_name;
@@ -19,23 +11,20 @@ class Database {
     private $password;
 
     private function __construct() {
+        // Railway usa estas variables — se prueba en orden de más a menos específico
+        $this->host     = getenv('MYSQLHOST')     ?: getenv('MYSQL_HOST')     ?: 'localhost';
+        $this->port     = getenv('MYSQLPORT')     ?: getenv('MYSQL_PORT')     ?: '3306';
+        $this->db_name  = getenv('MYSQLDATABASE') ?: getenv('MYSQL_DATABASE') ?: 'proyecto_db';
+        $this->username = getenv('MYSQLUSER')     ?: getenv('MYSQL_USER')     ?: 'root';
+        $this->password = getenv('MYSQLPASSWORD') ?: getenv('MYSQL_PASSWORD') ?: '';
 
-        // Obtener variables de entorno (compatibles con Railway)
-        $this->host = getenv('MYSQL_HOST') ?: getenv('MYSQLHOST') ?: "db";
-        $this->port = getenv('MYSQL_PORT') ?: getenv('MYSQLPORT') ?: "3306";
-        $this->db_name = getenv('MYSQL_DATABASE') ?: getenv('MYSQLDATABASE') ?: "proyecto_db";
-        $this->username = getenv('MYSQL_USER') ?: getenv('MYSQLUSER') ?: "usuario";
-        $this->password = getenv('MYSQL_PASSWORD') ?: getenv('MYSQLPASSWORD') ?: "password123";
-        
-        // Railway a veces usa MYSQL_URL completa
-        if (getenv('MYSQL_URL')) {
-            $this->parseConnectionUrl(getenv('MYSQL_URL'));
+        // Si Railway provee URL completa, usarla
+        $url = getenv('MYSQL_URL') ?: getenv('DATABASE_URL');
+        if ($url) {
+            $this->parseConnectionUrl($url);
         }
     }
 
-    /**
-     * Patrón Singleton: Una sola instancia de conexión
-     */
     public static function getInstance() {
         if (self::$instance === null) {
             self::$instance = new Database();
@@ -46,126 +35,97 @@ class Database {
     private function parseConnectionUrl($url) {
         $parts = parse_url($url);
         if ($parts) {
-            $this->host = $parts['host'] ?? $this->host;
-            $this->username = $parts['user'] ?? $this->username;
-            $this->password = $parts['pass'] ?? $this->password;
-            // NO cambiar db_name, siempre proyecto_db
+            $this->host     = $parts['host']                      ?? $this->host;
+            $this->port     = isset($parts['port']) ? (string)$parts['port'] : $this->port;
+            $this->username = $parts['user']                      ?? $this->username;
+            $this->password = $parts['pass']                      ?? $this->password;
+            // Quitar el "/" inicial del path para obtener el nombre de la DB
+            if (!empty($parts['path'])) {
+                $this->db_name = ltrim($parts['path'], '/') ?: $this->db_name;
+            }
         }
     }
 
-   public function getConnection() {
-    if ($this->conn === null) {
-        try {
-            $this->conn = new PDO(
-                "mysql:host={$this->host};port={$this->port};dbname={$this->db_name};charset=utf8mb4",
-                $this->username,
-                $this->password,
-                [
-                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+    public function getConnection() {
+        if ($this->conn === null) {
+            try {
+                $dsn = "mysql:host={$this->host};port={$this->port};dbname={$this->db_name};charset=utf8mb4";
+                $this->conn = new PDO($dsn, $this->username, $this->password, [
+                    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
                     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                    PDO::ATTR_EMULATE_PREPARES => false,
-                ]
-            );
-        } catch(PDOException $exception) {
-            error_log("Error de conexión DB: " . $exception->getMessage());
-            die(json_encode(['error' => 'Error de conexión al servidor']));
+                    PDO::ATTR_EMULATE_PREPARES   => false,
+                    PDO::ATTR_TIMEOUT            => 10,
+                ]);
+            } catch (PDOException $e) {
+                error_log("Error de conexión DB: " . $e->getMessage());
+                http_response_code(500);
+                echo json_encode(['error' => 'Error de conexión al servidor']);
+                exit;
+            }
         }
+        return $this->conn;
     }
-    return $this->conn;
-}
 
-    // Prevenir clonación de la instancia
     private function __clone() {}
-    
-    // Prevenir deserialización
-    public function __wakeup() {
-        throw new Exception("Cannot unserialize singleton");
-    }
+    public function __wakeup() { throw new Exception("Cannot unserialize singleton"); }
 }
 
-/**
- * =================================================================
- * FUNCIÓN: setCorsHeaders()
- * =================================================================
- * Headers CORS seguros
- * =================================================================
- */
+// ─── CORS ────────────────────────────────────────────────────────────────────
 function setCorsHeaders() {
-    /**
-     * =============================================================
-     * PROBLEMA 3 - DISEÑO INSEGURO: SOLUCIONADO ✅
-     * =============================================================
-     * En producción, especificar dominios permitidos
-     * No usar * en producción
-     * =============================================================
-     */
     $allowed_origin = getenv('ALLOWED_ORIGIN') ?: '*';
     header("Access-Control-Allow-Origin: $allowed_origin");
+    header("Access-Control-Allow-Credentials: true");
     header("Content-Type: application/json; charset=UTF-8");
-    header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE");
+    header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
     header("Access-Control-Max-Age: 3600");
     header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
-    
-    // Seguridad adicional
     header("X-Content-Type-Options: nosniff");
     header("X-Frame-Options: DENY");
     header("X-XSS-Protection: 1; mode=block");
+
+    // ✅ Responder preflight OPTIONS y salir
+    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+        http_response_code(204);
+        exit;
+    }
 }
 
-/**
- * =================================================================
- * FUNCIÓN: sendResponse()
- * =================================================================
- * Enviar respuestas JSON estandarizadas
- * =================================================================
- */
+// ─── Respuesta JSON ───────────────────────────────────────────────────────────
 function sendResponse($status, $data) {
     http_response_code($status);
     echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
 
-/**
- * =================================================================
- * PROBLEMA 1 - BROKEN ACCESS CONTROL: SOLUCIONADO ✅
- * =================================================================
- * Función para validar sesión y permisos
- * =================================================================
- */
+// ─── Sesión segura (llamar UNA sola vez) ─────────────────────────────────────
+function iniciarSesionSegura() {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start([
+            'cookie_httponly' => true,
+            'cookie_secure'   => isset($_SERVER['HTTPS']),
+            'cookie_samesite' => 'Strict',
+            'use_strict_mode' => true,
+        ]);
+    }
+}
+
+// ─── Validar sesión ───────────────────────────────────────────────────────────
 function validarSesion() {
-    session_start([
-        'cookie_httponly' => true,
-        'cookie_secure' => true,
-        'cookie_samesite' => 'Strict'
-    ]);
-    
+    iniciarSesionSegura();
     if (!isset($_SESSION['usuario_id'])) {
         sendResponse(401, ['error' => 'No autorizado. Debe iniciar sesión.']);
     }
-    
     return $_SESSION['usuario_id'];
 }
 
-/**
- * =================================================================
- * PROBLEMA 1 - BROKEN ACCESS CONTROL: SOLUCIONADO ✅
- * =================================================================
- * Verificar que el usuario tenga acceso al recurso
- * =================================================================
- */
+// ─── Verificar acceso a recurso ───────────────────────────────────────────────
 function verificarAccesoRecurso($usuario_id_sesion, $usuario_id_recurso) {
     if ($usuario_id_sesion != $usuario_id_recurso) {
-        sendResponse(403, ['error' => 'Acceso denegado. No tiene permisos para este recurso.']);
+        sendResponse(403, ['error' => 'Acceso denegado.']);
     }
 }
 
-/**
- * =================================================================
- * PROBLEMA 2 - FALLAS CRIPTOGRÁFICAS: SOLUCIONADO ✅
- * =================================================================
- * Sanitizar datos de entrada
- * =================================================================
- */
+// ─── Sanitizar ────────────────────────────────────────────────────────────────
 function sanitizarInput($data) {
     if (is_array($data)) {
         return array_map('sanitizarInput', $data);
@@ -173,13 +133,7 @@ function sanitizarInput($data) {
     return htmlspecialchars(strip_tags(trim($data)), ENT_QUOTES, 'UTF-8');
 }
 
-/**
- * =================================================================
- * PROBLEMA 2 - FALLAS CRIPTOGRÁFICAS: SOLUCIONADO ✅
- * =================================================================
- * Validar y sanitizar email
- * =================================================================
- */
+// ─── Validar email ────────────────────────────────────────────────────────────
 function validarEmail($email) {
     $email = filter_var($email, FILTER_SANITIZE_EMAIL);
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -188,37 +142,28 @@ function validarEmail($email) {
     return $email;
 }
 
-/**
- * =================================================================
- * PROBLEMA 1 - BROKEN ACCESS CONTROL: SOLUCIONADO ✅
- * =================================================================
- * Rate limiting simple (prevenir fuerza bruta)
- * =================================================================
- */
+// ─── Rate limiting ────────────────────────────────────────────────────────────
+// ✅ Ya NO llama session_start() — usa iniciarSesionSegura() que evita doble inicio
 function verificarRateLimit($identificador, $max_intentos = 5, $ventana = 300) {
-    session_start();
-    $key = 'rate_limit_' . $identificador;
-    
+    iniciarSesionSegura(); // ← Seguro: solo inicia si no hay sesión activa
+
+    $key = 'rate_limit_' . md5($identificador);
+
     if (!isset($_SESSION[$key])) {
         $_SESSION[$key] = ['count' => 0, 'time' => time()];
     }
-    
-    $rate_data = $_SESSION[$key];
-    
-    // Resetear si pasó la ventana de tiempo
-    if (time() - $rate_data['time'] > $ventana) {
+
+    // Resetear ventana si expiró
+    if (time() - $_SESSION[$key]['time'] > $ventana) {
         $_SESSION[$key] = ['count' => 1, 'time' => time()];
         return true;
     }
-    
-    // Verificar límite
-    if ($rate_data['count'] >= $max_intentos) {
-        sendResponse(429, [
-            'error' => 'Demasiados intentos. Espere ' . 
-                      ($ventana - (time() - $rate_data['time'])) . ' segundos.'
-        ]);
+
+    if ($_SESSION[$key]['count'] >= $max_intentos) {
+        $espera = $ventana - (time() - $_SESSION[$key]['time']);
+        sendResponse(429, ['error' => "Demasiados intentos. Espere {$espera} segundos."]);
     }
-    
+
     $_SESSION[$key]['count']++;
     return true;
 }

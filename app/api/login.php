@@ -15,16 +15,15 @@ setCorsHeaders();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     sendResponse(405, ['error' => 'Método no permitido']);
-    exit;
 }
 
 $data = json_decode(file_get_contents("php://input"));
 
 if (!$data || empty($data->email) || empty($data->password)) {
     sendResponse(400, ['error' => 'Email y contraseña requeridos']);
-    exit;
 }
 
+// ✅ Rate limit (internamente llama iniciarSesionSegura)
 verificarRateLimit($data->email, 5, 300);
 
 $email = validarEmail($data->email);
@@ -41,23 +40,17 @@ try {
     if ($stmt->rowCount() === 0) {
         error_log("Login fallido - Email no encontrado: " . $email);
         sendResponse(401, ['error' => 'Credenciales inválidas']);
-        exit;
     }
 
     $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (password_verify($data->password, $usuario['password'])) {
 
-        session_start([
-            'cookie_httponly' => true,
-            'cookie_secure' => isset($_SERVER['HTTPS']),
-            'cookie_samesite' => 'Strict',
-            'use_strict_mode' => true
-        ]);
-
+        // ✅ Usar iniciarSesionSegura en lugar de session_start() directo
+        iniciarSesionSegura();
         session_regenerate_id(true);
 
-        $_SESSION['usuario_id'] = $usuario['id'];
+        $_SESSION['usuario_id']    = $usuario['id'];
         $_SESSION['usuario_email'] = $usuario['email'];
         $_SESSION['last_activity'] = time();
 
@@ -72,35 +65,28 @@ try {
         $log_stmt->bindParam(":usuario_id", $usuario['id'], PDO::PARAM_INT);
         $log_stmt->execute();
 
-        // RESPUESTA CORRECTA QUE TU FRONTEND NECESITA
-        $response = [
-            'success' => true,
-            'mensaje' => 'Login exitoso',
-            'usuario' => [
-                'id' => (int)$usuario['id'],
+        sendResponse(200, [
+            'success'    => true,
+            'mensaje'    => 'Login exitoso',
+            'usuario'    => [
+                'id'     => (int)$usuario['id'],
                 'nombre' => sanitizarInput($usuario['nombre']),
-                'email' => $usuario['email']
+                'email'  => $usuario['email']
             ],
             'csrf_token' => $_SESSION['csrf_token'],
             'session_id' => session_id()
-        ];
-
-        sendResponse(200, $response);
-        exit;
+        ]);
 
     } else {
         error_log("Login fallido - Password incorrecta para: " . $email);
         sendResponse(401, ['error' => 'Credenciales inválidas']);
-        exit;
     }
 
-} catch(PDOException $e) {
+} catch (PDOException $e) {
     error_log("Error DB en login: " . $e->getMessage());
     sendResponse(500, ['error' => 'Error del servidor']);
-    exit;
-} catch(Exception $e) {
+} catch (Exception $e) {
     error_log("Error en login: " . $e->getMessage());
     sendResponse(500, ['error' => 'Error del servidor']);
-    exit;
 }
 ?>
