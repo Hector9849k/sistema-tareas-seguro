@@ -11,14 +11,17 @@ RUN apk add --no-cache \
 # Instalar extensión PDO MySQL
 RUN docker-php-ext-install pdo pdo_mysql
 
-# Copiar archivos de la aplicación
-COPY app /var/www/html/app
-COPY app/index.html /var/www/html/index.html
-COPY nginx.conf /etc/nginx/http.d/default.conf
+# Establecer directorio raíz web
+WORKDIR /var/www/html
 
-# Crear directorio para logs de Nginx
-RUN mkdir -p /var/log/nginx && \
-    chown -R www-data:www-data /var/www/html
+# Copiar TODOS los archivos del proyecto a /var/www/html
+COPY . /var/www/html/
+
+# Permisos
+RUN chown -R www-data:www-data /var/www/html
+
+# Crear directorio para logs
+RUN mkdir -p /var/log/nginx
 
 # Configurar PHP-FPM para escuchar en TCP
 RUN mkdir -p /usr/local/etc/php-fpm.d && \
@@ -28,7 +31,7 @@ RUN mkdir -p /usr/local/etc/php-fpm.d && \
     echo "user = www-data" >> /usr/local/etc/php-fpm.d/zz-docker.conf && \
     echo "group = www-data" >> /usr/local/etc/php-fpm.d/zz-docker.conf
 
-# Script de inicio - usar sh directamente
+# Script de inicio
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
