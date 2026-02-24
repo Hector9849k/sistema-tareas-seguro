@@ -1,8 +1,11 @@
 FROM php:8.2-apache
 
-RUN docker-php-ext-install pdo pdo_mysql
+RUN rm /etc/apache2/mods-enabled/mpm_event.conf \
+    && rm /etc/apache2/mods-enabled/mpm_event.load \
+    && ln -s /etc/apache2/mods-available/mpm_prefork.conf /etc/apache2/mods-enabled/mpm_prefork.conf \
+    && ln -s /etc/apache2/mods-available/mpm_prefork.load /etc/apache2/mods-enabled/mpm_prefork.load
 
-RUN sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf
+RUN docker-php-ext-install pdo pdo_mysql
 
 COPY ./app /var/www/html/
 
