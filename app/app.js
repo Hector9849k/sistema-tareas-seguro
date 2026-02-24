@@ -2,7 +2,8 @@
 let usuarioActual = null;
 const API_URL = '/api';
 
-// Función para cambiar entre Login y Registro
+// ==================== AUTENTICACIÓN ====================
+
 function cambiarAuthTab(tab) {
     const loginForm = document.getElementById('form-login');
     const registroForm = document.getElementById('form-registro');
@@ -12,10 +13,10 @@ function cambiarAuthTab(tab) {
     loginForm.classList.add('hidden');
     registroForm.classList.add('hidden');
 
-    // Remover clase active de todas las pestañas
+    // Remover clase active
     tabs.forEach(t => t.classList.remove('active'));
 
-    // Mostrar el formulario correspondiente
+    // Mostrar el correcto
     if (tab === 'login') {
         loginForm.classList.remove('hidden');
         tabs[0].classList.add('active');
@@ -28,8 +29,9 @@ function cambiarAuthTab(tab) {
     document.getElementById('mensaje-auth').innerHTML = '';
 }
 
-// Funciones de autenticación
-async function login() {
+async function login(e) {
+    e.preventDefault();
+    
     const email = document.getElementById('login-email').value;
     const password = document.getElementById('login-password').value;
 
@@ -45,17 +47,19 @@ async function login() {
         if (response.ok) {
             usuarioActual = data;
             localStorage.setItem('usuario', JSON.stringify(data));
-            mostrarMensaje('mensaje-auth', 'Login exitoso', 'exito');
-            mostrarApp();
+            mostrarMensaje('mensaje-auth', '✅ Login exitoso', 'exito');
+            setTimeout(() => mostrarApp(), 1500);
         } else {
-            mostrarMensaje('mensaje-auth', data.error, 'error');
+            mostrarMensaje('mensaje-auth', data.error || 'Error al iniciar sesión', 'error');
         }
     } catch (error) {
         mostrarMensaje('mensaje-auth', 'Error de conexión: ' + error.message, 'error');
     }
 }
 
-async function registrar() {
+async function registrar(e) {
+    e.preventDefault();
+    
     const nombre = document.getElementById('registro-nombre').value;
     const email = document.getElementById('registro-email').value;
     const password = document.getElementById('registro-password').value;
@@ -86,14 +90,13 @@ async function registrar() {
             document.getElementById('registro-email').value = '';
             document.getElementById('registro-password').value = '';
             
-            // Cambiar a la pestaña de login después de 2 segundos
+            // Cambiar a login después de 2 segundos
             setTimeout(() => {
                 cambiarAuthTab('login');
-                // Pre-llenar el email en el login
                 document.getElementById('login-email').value = email;
             }, 2000);
         } else {
-            mostrarMensaje('mensaje-auth', data.error, 'error');
+            mostrarMensaje('mensaje-auth', data.error || 'Error al registrar', 'error');
         }
     } catch (error) {
         mostrarMensaje('mensaje-auth', 'Error de conexión: ' + error.message, 'error');
@@ -105,6 +108,8 @@ function logout() {
     localStorage.removeItem('usuario');
     document.getElementById('auth-container').classList.remove('hidden');
     document.getElementById('app-container').classList.add('hidden');
+    document.getElementById('login-email').value = '';
+    document.getElementById('login-password').value = '';
 }
 
 function mostrarApp() {
@@ -114,7 +119,8 @@ function mostrarApp() {
     cargarTareas();
 }
 
-// Funciones de tareas
+// ==================== TAREAS ====================
+
 async function cargarTareas() {
     try {
         const response = await fetch(`${API_URL}/tareas.php?usuario_id=${usuarioActual.usuario_id}`);
@@ -130,21 +136,22 @@ async function cargarTareas() {
                         <div class="task-header">
                             <div>
                                 <strong>${tarea.titulo}</strong>
+                                <p>${tarea.descripcion || 'Sin descripción'}</p>
+                                <small>Creada: ${tarea.fecha_creacion}</small>
                             </div>
-                            <div class="task-actions" style="display: flex; flex-direction: column; gap: 5px;">
-                                <button onclick="eliminarTarea(${tarea.id})" class="danger">🗑️ Eliminar</button>
+                            <div class="task-actions">
+                                <button onclick="eliminarTarea(${tarea.id})" class="btn-primary" style="width: 100px;">🗑️ Eliminar</button>
                             </div>
                         </div>
-                        <p>${tarea.descripcion || 'Sin descripción'}</p>
-                        <small>Creada: ${tarea.fecha_creacion}</small>
                     </div>
                 `;
             });
         } else {
-            listaTareas.innerHTML = '<p>No tienes tareas aún. ¡Crea tu primera tarea!</p>';
+            listaTareas.innerHTML = '<p style="text-align: center; color: #999;">No tienes tareas aún. ¡Crea tu primera tarea!</p>';
         }
     } catch (error) {
-        mostrarMensaje('mensaje-tareas', 'Error al cargar tareas: ' + error.message, 'error');
+        console.error('Error al cargar tareas:', error);
+        document.getElementById('lista-tareas').innerHTML = '<p style="color: red;">Error al cargar tareas</p>';
     }
 }
 
@@ -163,21 +170,20 @@ async function crearTarea() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 usuario_id: usuarioActual.usuario_id,
-                titulo,
-                descripcion
+                titulo: titulo,
+                descripcion: descripcion
             })
         });
 
         const data = await response.json();
 
         if (response.ok) {
-            mostrarMensaje('mensaje-tareas', 'Tarea creada exitosamente', 'exito');
-            // Limpiar formulario
+            mostrarMensaje('mensaje-tareas', '✅ Tarea creada exitosamente', 'exito');
             document.getElementById('tarea-titulo').value = '';
             document.getElementById('tarea-descripcion').value = '';
             cargarTareas();
         } else {
-            mostrarMensaje('mensaje-tareas', data.error, 'error');
+            mostrarMensaje('mensaje-tareas', data.error || 'Error al crear tarea', 'error');
         }
     } catch (error) {
         mostrarMensaje('mensaje-tareas', 'Error de conexión: ' + error.message, 'error');
@@ -195,17 +201,18 @@ async function eliminarTarea(id) {
         const data = await response.json();
 
         if (response.ok) {
-            mostrarMensaje('mensaje-tareas', 'Tarea eliminada', 'exito');
+            mostrarMensaje('mensaje-tareas', '✅ Tarea eliminada', 'exito');
             cargarTareas();
         } else {
-            mostrarMensaje('mensaje-tareas', data.error, 'error');
+            mostrarMensaje('mensaje-tareas', data.error || 'Error al eliminar', 'error');
         }
     } catch (error) {
         mostrarMensaje('mensaje-tareas', 'Error de conexión: ' + error.message, 'error');
     }
 }
 
-// Funciones de estadísticas
+// ==================== ESTADÍSTICAS ====================
+
 async function cargarEstadisticas() {
     try {
         const response = await fetch(`${API_URL}/tareas.php?usuario_id=${usuarioActual.usuario_id}`);
@@ -241,20 +248,24 @@ async function cargarEstadisticas() {
     }
 }
 
-// Función para cambiar tabs
+// ==================== TABS ====================
+
 function cambiarTab(tab) {
-    // Ocultar todos los tabs
+    // Ocultar todos
     document.getElementById('tab-tareas').classList.add('hidden');
     document.getElementById('tab-estadisticas').classList.add('hidden');
 
-    // Desactivar todos los botones
+    // Desactivar botones
     document.querySelectorAll('.tab').forEach(btn => btn.classList.remove('active'));
 
-    // Mostrar tab seleccionado
+    // Mostrar seleccionado
     document.getElementById(`tab-${tab}`).classList.remove('hidden');
-    event.target.classList.add('active');
+    
+    if (event && event.target) {
+        event.target.classList.add('active');
+    }
 
-    // Cargar datos según el tab
+    // Cargar datos
     if (tab === 'tareas') {
         cargarTareas();
     } else if (tab === 'estadisticas') {
@@ -262,7 +273,8 @@ function cambiarTab(tab) {
     }
 }
 
-// Función auxiliar para mostrar mensajes
+// ==================== UTILIDADES ====================
+
 function mostrarMensaje(elementoId, mensaje, tipo) {
     const elemento = document.getElementById(elementoId);
     elemento.innerHTML = `<div class="mensaje ${tipo}">${mensaje}</div>`;
@@ -271,9 +283,9 @@ function mostrarMensaje(elementoId, mensaje, tipo) {
     }, 5000);
 }
 
-// Inicialización
+// ==================== INICIALIZACIÓN ====================
+
 document.addEventListener('DOMContentLoaded', function() {
-    // Verificar si hay usuario guardado
     const usuarioGuardado = localStorage.getItem('usuario');
     if (usuarioGuardado) {
         try {

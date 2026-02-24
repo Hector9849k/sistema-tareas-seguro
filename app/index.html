@@ -15,15 +15,12 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             padding: 20px;
         }
 
         .container {
-            width: 100%;
-            max-width: 500px;
+            max-width: 1200px;
+            margin: 0 auto;
         }
 
         .card {
@@ -33,29 +30,29 @@
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
         }
 
+        h1, h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
         .header {
             text-align: center;
             margin-bottom: 30px;
         }
 
-        .header h1 {
-            font-size: 28px;
-            color: #333;
-            margin: 15px 0;
-        }
-
-        .icon {
+        .header .icon {
             font-size: 40px;
+            margin-bottom: 10px;
         }
 
-        .tabs {
+        .auth-tabs {
             display: flex;
             gap: 20px;
             border-bottom: 2px solid #f0f0f0;
             margin-bottom: 30px;
         }
 
-        .tab-btn {
+        .auth-tab {
             padding: 10px 0;
             cursor: pointer;
             color: #999;
@@ -67,11 +64,11 @@
             font-size: 14px;
         }
 
-        .tab-btn:hover {
+        .auth-tab:hover {
             color: #667eea;
         }
 
-        .tab-btn.active {
+        .auth-tab.active {
             color: #667eea;
             border-bottom-color: #667eea;
         }
@@ -147,14 +144,6 @@
             display: none !important;
         }
 
-        .panel {
-            display: none;
-        }
-
-        .panel.active {
-            display: block;
-        }
-
         .mensaje {
             padding: 12px;
             border-radius: 8px;
@@ -180,8 +169,6 @@
             border-radius: 15px;
             padding: 30px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            max-width: 900px;
-            margin: 0 auto;
         }
 
         .app-header {
@@ -205,6 +192,7 @@
         .app-header .user-info p {
             color: #666;
             font-size: 14px;
+            margin-bottom: 10px;
         }
 
         .btn-logout {
@@ -215,7 +203,6 @@
             cursor: pointer;
             border: none;
             transition: all 0.3s ease;
-            margin-top: 10px;
         }
 
         .btn-logout:hover {
@@ -229,7 +216,7 @@
             border-bottom: 2px solid #f0f0f0;
         }
 
-        .app-tab-btn {
+        .tab {
             padding: 10px 20px;
             background: none;
             border: none;
@@ -240,7 +227,7 @@
             transition: all 0.3s ease;
         }
 
-        .app-tab-btn.active {
+        .tab.active {
             color: #667eea;
             border-bottom-color: #667eea;
         }
@@ -259,22 +246,33 @@
             color: #333;
         }
 
+        .task-item p {
+            color: #666;
+            margin: 8px 0;
+        }
+
         .task-item small {
             color: #999;
             display: block;
             margin-top: 10px;
         }
 
+        .task-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
         .task-actions {
             display: flex;
-            gap: 10px;
-            margin-top: 10px;
+            gap: 5px;
         }
 
         .task-actions button {
-            flex: 1;
-            padding: 8px;
+            padding: 8px 15px;
             font-size: 12px;
+            width: auto;
         }
 
         .input-group {
@@ -292,6 +290,28 @@
             width: auto;
             padding: 12px 20px;
         }
+
+        .stat-card {
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            text-align: center;
+            border-left: 4px solid #667eea;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+            margin-top: 10px;
+        }
+
+        #stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
     </style>
 </head>
 <body>
@@ -303,15 +323,15 @@
                 <h1>Sistema de Gestión de Tareas</h1>
             </div>
 
-            <div class="tabs">
-                <button class="tab-btn active" onclick="cambiarAuthTab('login')">Iniciar Sesión</button>
-                <button class="tab-btn" onclick="cambiarAuthTab('registro')">Registrarse</button>
+            <div class="auth-tabs">
+                <button class="auth-tab active" onclick="cambiarAuthTab('login')">Iniciar Sesión</button>
+                <button class="auth-tab" onclick="cambiarAuthTab('registro')">Registrarse</button>
             </div>
 
             <div id="mensaje-auth"></div>
 
             <!-- PANEL LOGIN -->
-            <div id="panel-login" class="panel active">
+            <div id="form-login">
                 <h2 style="margin-bottom: 20px; color: #333;">Bienvenido de nuevo</h2>
                 <form onsubmit="login(event)">
                     <div class="form-group">
@@ -330,7 +350,7 @@
             </div>
 
             <!-- PANEL REGISTRO -->
-            <div id="panel-registro" class="panel" style="display: none;">
+            <div id="form-registro" class="hidden">
                 <h2 style="margin-bottom: 20px; color: #333;">Crear cuenta nueva</h2>
                 <form onsubmit="registrar(event)">
                     <div class="form-group">
@@ -366,16 +386,17 @@
             </div>
 
             <div class="app-tabs">
-                <button class="app-tab-btn active" onclick="cambiarTab('tareas')">📋 Tareas</button>
-                <button class="app-tab-btn" onclick="cambiarTab('estadisticas')">📊 Estadísticas</button>
+                <button class="tab active" onclick="cambiarTab('tareas')">📋 Tareas</button>
+                <button class="tab" onclick="cambiarTab('estadisticas')">📊 Estadísticas</button>
             </div>
 
             <div id="mensaje-tareas"></div>
 
             <!-- TAB TAREAS -->
-            <div id="tab-tareas" class="hidden">
+            <div id="tab-tareas">
                 <div class="input-group">
-                    <input type="text" id="tarea-titulo" placeholder="Escribe una nueva tarea...">
+                    <input type="text" id="tarea-titulo" placeholder="Escribe el título de la tarea...">
+                    <input type="text" id="tarea-descripcion" placeholder="Descripción (opcional)...">
                     <button class="btn-primary" onclick="crearTarea()">Agregar</button>
                 </div>
                 <div id="lista-tareas">
@@ -386,7 +407,7 @@
             <!-- TAB ESTADISTICAS -->
             <div id="tab-estadisticas" class="hidden">
                 <h2>Estadísticas</h2>
-                <div id="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin: 20px 0;">
+                <div id="stats-grid">
                     <p>Cargando estadísticas...</p>
                 </div>
             </div>
