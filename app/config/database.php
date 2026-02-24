@@ -27,17 +27,18 @@ class Database {
          * Usar variables de entorno en producción
          * =============================================================
          */
-        // CORREGIDO: Usar "proyecto_db" directamente (donde está el init.sql)
-        $this->host = getenv('MYSQL_HOST') ?: getenv('MYSQLHOST') ?: "mysql.railway.internal";
-        $this->db_name = "proyecto_db"; // ✅ FORZAMOS proyecto_db
-        $this->username = getenv('MYSQL_USER') ?: getenv('MYSQLUSER') ?: "root";
-        $this->password = getenv('MYSQL_PASSWORD') ?: getenv('MYSQLPASSWORD') ?: "";
+        // Leer variables de entorno de Railway
+        $this->host = getenv('MYSQLHOST') ?: getenv('MYSQL_HOST') ?: "mysql.railway.internal";
+        $this->username = getenv('MYSQLUSER') ?: getenv('MYSQL_USER') ?: "root";
+        $this->password = getenv('MYSQLPASSWORD') ?: getenv('MYSQL_PASSWORD') ?: "";
         
-        // Railway a veces usa MYSQL_URL completa
+        // SIEMPRE usar proyecto_db donde importamos init.sql
+        $this->db_name = "proyecto_db";
+        
+        // Si hay MYSQL_URL, parsear pero mantener proyecto_db
         if (getenv('MYSQL_URL')) {
             $this->parseConnectionUrl(getenv('MYSQL_URL'));
-            // Pero SIEMPRE usar proyecto_db
-            $this->db_name = "proyecto_db";
+            $this->db_name = "proyecto_db"; // Siempre proyecto_db
         }
     }
 
@@ -57,7 +58,7 @@ class Database {
             $this->host = $parts['host'] ?? $this->host;
             $this->username = $parts['user'] ?? $this->username;
             $this->password = $parts['pass'] ?? $this->password;
-            // NO cambiar db_name aquí, siempre usar proyecto_db
+            // NO cambiar db_name, siempre proyecto_db
         }
     }
 
@@ -71,7 +72,7 @@ class Database {
                     [
                         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                        PDO::ATTR_EMULATE_PREPARES => false, // Seguridad adicional
+                        PDO::ATTR_EMULATE_PREPARES => false,
                     ]
                 );
             } catch(PDOException $exception) {
@@ -149,9 +150,9 @@ function sendResponse($status, $data) {
  */
 function validarSesion() {
     session_start([
-        'cookie_httponly' => true,  // No accesible desde JavaScript
-        'cookie_secure' => true,     // Solo HTTPS
-        'cookie_samesite' => 'Strict' // Protección CSRF
+        'cookie_httponly' => true,
+        'cookie_secure' => true,
+        'cookie_samesite' => 'Strict'
     ]);
     
     if (!isset($_SESSION['usuario_id'])) {
