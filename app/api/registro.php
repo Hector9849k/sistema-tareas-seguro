@@ -22,7 +22,7 @@ if (!filter_var($data->email, FILTER_VALIDATE_EMAIL)) {
 }
 
 try {
-    $database = new Database();
+    $database = Database::getInstance();
     $db = $database->getConnection();
 
     // Verificar si el email ya existe
@@ -52,10 +52,15 @@ try {
             'usuario_id' => $db->lastInsertId()
         ]);
     } else {
+        error_log("Error al registrar: " . implode(", ", $stmt->errorInfo()));
         sendResponse(500, ['error' => 'Error al registrar usuario']);
     }
 
 } catch(PDOException $e) {
-    sendResponse(500, ['error' => 'Error del servidor: ' . $e->getMessage()]);
+    error_log("Error DB en registro: " . $e->getMessage());
+    sendResponse(500, ['error' => 'Error del servidor']);
+} catch(Exception $e) {
+    error_log("Error en registro: " . $e->getMessage());
+    sendResponse(500, ['error' => 'Error del servidor']);
 }
 ?>
