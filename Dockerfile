@@ -5,7 +5,8 @@ RUN apk add --no-cache \
     nginx \
     mysql-client \
     curl \
-    git
+    git \
+    bash
 
 # Instalar extensión PDO MySQL
 RUN docker-php-ext-install pdo pdo_mysql
@@ -19,14 +20,18 @@ COPY nginx.conf /etc/nginx/http.d/default.conf
 RUN mkdir -p /var/log/nginx && \
     chown -R www-data:www-data /var/www/html
 
-# Configurar PHP-FPM para escuchar en TCP (no socket)
-RUN echo "listen = 127.0.0.1:9000" > /usr/local/etc/php-fpm.d/zz-docker.conf && \
-    echo "listen.allowed_clients = 127.0.0.1" >> /usr/local/etc/php-fpm.d/zz-docker.conf
+# Configurar PHP-FPM para escuchar en TCP
+RUN mkdir -p /usr/local/etc/php-fpm.d && \
+    echo "[global]" > /usr/local/etc/php-fpm.d/zz-docker.conf && \
+    echo "listen = 127.0.0.1:9000" >> /usr/local/etc/php-fpm.d/zz-docker.conf && \
+    echo "[www]" >> /usr/local/etc/php-fpm.d/zz-docker.conf && \
+    echo "user = www-data" >> /usr/local/etc/php-fpm.d/zz-docker.conf && \
+    echo "group = www-data" >> /usr/local/etc/php-fpm.d/zz-docker.conf
 
-# Script de inicio que corre Nginx y PHP-FPM
-RUN echo '#!/bin/sh\nphp-fpm &\nnginx -g "daemon off;"' > /entrypoint.sh && \
-    chmod +x /entrypoint.sh
+# Script de inicio - usar sh directamente
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 EXPOSE 80
 
-ENTRYPOINT ["/entrypoint.sh"]
+CMD ["/entrypoint.sh"]
