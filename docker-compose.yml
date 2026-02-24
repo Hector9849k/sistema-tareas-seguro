@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  # Servidor Web Apache + PHP
+  web:
+    image: php:8.2-apache
+    container_name: servidor_web
+    ports:
+      - "8080:80"
+    volumes:
+      - ./app:/var/www/html
+    depends_on:
+      - db
+    networks:
+      - app-network
+    environment:
+      - MYSQL_HOST=db
+      - MYSQL_DATABASE=proyecto_db
+      - MYSQL_USER=usuario
+      - MYSQL_PASSWORD=password123
+
+  # Base de datos MySQL
+  db:
+    image: mysql:8.0
+    container_name: base_datos
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: proyecto_db
+      MYSQL_USER: usuario
+      MYSQL_PASSWORD: password123
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - app-network
+
+  # PhpMyAdmin para gestionar la BD
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: phpmyadmin
+    ports:
+      - "8081:80"
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+      PMA_USER: root
+      PMA_PASSWORD: root123
+    depends_on:
+      - db
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  db_data:

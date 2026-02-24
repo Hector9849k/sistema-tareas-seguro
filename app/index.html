@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Gestión de Tareas</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        h1, h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .auth-section {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .auth-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .auth-tab {
+            flex: 1;
+            padding: 15px;
+            background: transparent;
+            border: none;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.3s;
+        }
+
+        .auth-tab:hover {
+            color: #667eea;
+            transform: none;
+        }
+
+        .auth-tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+            background: transparent;
+        }
+
+        .switch-form {
+            text-align: center;
+            margin-top: 20px;
+            color: #666;
+        }
+
+        .switch-form a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .switch-form a:hover {
+            text-decoration: underline;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+        }
+
+        button.secondary {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        button.danger {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .task-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .task-item.alta {
+            border-left-color: #dc3545;
+        }
+
+        .task-item.media {
+            border-left-color: #ffc107;
+        }
+
+        .task-item.baja {
+            border-left-color: #28a745;
+        }
+
+        .task-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .task-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            color: white;
+        }
+
+        .badge.pendiente { background: #6c757d; }
+        .badge.en_progreso { background: #007bff; }
+        .badge.completada { background: #28a745; }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #4c51bf 0%, #5b21b6 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .weather-card {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+        }
+
+        .mensaje {
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .mensaje.exito {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .mensaje.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            background: #4c51bf;
+            color: white;
+            border: none;
+            border-radius: 8px 8px 0 0;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .tab:hover {
+            background: #5b21b6;
+        }
+
+        .tab.active {
+            background: #5b21b6;
+            color: white;
+            font-weight: 700;
+        }
+
+        .user-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        /* Estilos para el modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            animation: fadeIn 0.3s;
+        }
+
+        .modal.show {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 30px;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            animation: slideIn 0.3s;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+        }
+
+        .close-modal {
+            background: #e0e0e0;
+            border: none;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .close-modal:hover {
+            background: #d0d0d0;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .modal-buttons button {
+            flex: 1;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Sección de autenticación -->
+        <div id="auth-container" class="card">
+            <h1>🚀 Sistema de Gestión de Tareas</h1>
+            
+            <!-- Pestañas de Login y Registro -->
+            <div class="auth-tabs">
+                <button class="auth-tab active" onclick="cambiarAuthTab('login')">Iniciar Sesión</button>
+                <button class="auth-tab" onclick="cambiarAuthTab('registro')">Registrarse</button>
+            </div>
+
+            <!-- Formulario de Login -->
+            <div id="form-login">
+                <h2>Bienvenido de nuevo</h2>
+                <div class="form-group">
+                    <label>Email:</label>
+                    <input type="email" id="login-email" placeholder="tu@email.com">
+                </div>
+                <div class="form-group">
+                    <label>Contraseña:</label>
+                    <input type="password" id="login-password" placeholder="Tu contraseña">
+                </div>
+                <button onclick="login()" style="width: 100%;">Iniciar Sesión</button>
+                <p class="switch-form">
+                    ¿No tienes una cuenta? 
+                    <a href="javascript:void(0)" onclick="cambiarAuthTab('registro')">Regístrate aquí</a>
+                </p>
+            </div>
+
+            <!-- Formulario de Registro -->
+            <div id="form-registro" class="hidden">
+                <h2>Crear cuenta nueva</h2>
+                <div class="form-group">
+                    <label>Nombre completo:</label>
+                    <input type="text" id="registro-nombre" placeholder="Tu nombre">
+                </div>
+                <div class="form-group">
+                    <label>Email:</label>
+                    <input type="email" id="registro-email" placeholder="tu@email.com">
+                </div>
+                <div class="form-group">
+                    <label>Contraseña:</label>
+                    <input type="password" id="registro-password" placeholder="Mínimo 6 caracteres">
+                </div>
+                <button class="secondary" onclick="registrar()" style="width: 100%;">Crear Cuenta</button>
+                <p class="switch-form">
+                    ¿Ya tienes una cuenta? 
+                    <a href="javascript:void(0)" onclick="cambiarAuthTab('login')">Inicia sesión aquí</a>
+                </p>
+            </div>
+
+            <div id="mensaje-auth"></div>
+        </div>
+
+        <!-- Sección principal (oculta hasta login) -->
+        <div id="app-container" class="hidden">
+            <div class="card">
+                <div class="user-info">
+                    <strong>👤 Usuario:</strong> <span id="user-name"></span>
+                    <button onclick="logout()" style="float: right;">Cerrar Sesión</button>
+                </div>
+
+                <div class="tabs">
+                    <button class="tab active" onclick="cambiarTab('tareas')">📝 Tareas</button>
+                    <button class="tab" onclick="cambiarTab('estadisticas')">📊 Estadísticas</button>
+                    <button class="tab" onclick="cambiarTab('clima')">🌤️ Clima</button>
+                </div>
+
+                <!-- Tab de Tareas -->
+                <div id="tab-tareas">
+                    <h2>Mis Tareas</h2>
+                    <div class="form-group">
+                        <label>Título:</label>
+                        <input type="text" id="tarea-titulo">
+                    </div>
+                    <div class="form-group">
+                        <label>Descripción:</label>
+                        <textarea id="tarea-descripcion" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Prioridad:</label>
+                        <select id="tarea-prioridad">
+                            <option value="baja">Baja</option>
+                            <option value="media" selected>Media</option>
+                            <option value="alta">Alta</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Estado:</label>
+                        <select id="tarea-estado">
+                            <option value="pendiente" selected>Pendiente</option>
+                            <option value="en_progreso">En Progreso</option>
+                            <option value="completada">Completada</option>
+                        </select>
+                    </div>
+                    <button onclick="crearTarea()">➕ Crear Tarea</button>
+                    <div id="mensaje-tareas"></div>
+                    <div id="lista-tareas" style="margin-top: 20px;"></div>
+                </div>
+
+                <!-- Tab de Estadísticas -->
+                <div id="tab-estadisticas" class="hidden">
+                    <h2>📊 Estadísticas</h2>
+                    <div class="stats-grid" id="stats-grid"></div>
+                    <h3>Actividades Recientes</h3>
+                    <div id="lista-actividades"></div>
+                </div>
+
+                <!-- Tab de Clima -->
+                <div id="tab-clima" class="hidden">
+                    <h2>🌤️ Consultar Clima</h2>
+                    <div class="form-group">
+                        <label>Ciudad:</label>
+                        <input type="text" id="ciudad-input" value="Mexico City">
+                    </div>
+                    <button onclick="consultarClima()">Consultar</button>
+                    <div id="resultado-clima" style="margin-top: 20px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Edición -->
+    <div id="modal-editar" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>✏️ Editar Tarea</h2>
+                <button class="close-modal" onclick="cerrarModal()">×</button>
+            </div>
+            <div class="form-group">
+                <label>Título:</label>
+                <input type="text" id="editar-titulo">
+            </div>
+            <div class="form-group">
+                <label>Descripción:</label>
+                <textarea id="editar-descripcion" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Prioridad:</label>
+                <select id="editar-prioridad">
+                    <option value="baja">Baja</option>
+                    <option value="media">Media</option>
+                    <option value="alta">Alta</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Estado:</label>
+                <select id="editar-estado">
+                    <option value="pendiente">Pendiente</option>
+                    <option value="en_progreso">En Progreso</option>
+                    <option value="completada">Completada</option>
+                </select>
+            </div>
+            <div class="modal-buttons">
+                <button class="secondary" onclick="cerrarModal()">❌ Cancelar</button>
+                <button onclick="guardarEdicion()">💾 Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
