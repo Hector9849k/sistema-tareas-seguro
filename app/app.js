@@ -2,20 +2,31 @@
 let usuarioActual = null;
 const API_URL = 'https://sistema-tareas-seguro-production.up.railway.app/api';
 
+// ✅ Recuperar usuario desde localStorage al cargar la página
+window.addEventListener('load', () => {
+    const guardado = localStorage.getItem('usuarioActual');
+    if (guardado) {
+        try {
+            usuarioActual = JSON.parse(guardado);
+            if (usuarioActual && usuarioActual.id) {
+                mostrarApp();
+            }
+        } catch (e) {
+            localStorage.removeItem('usuarioActual');
+        }
+    }
+});
+
 // Función para cambiar entre Login y Registro
 function cambiarAuthTab(tab) {
     const loginForm = document.getElementById('form-login');
     const registroForm = document.getElementById('form-registro');
     const tabs = document.querySelectorAll('.auth-tab');
 
-    // Ocultar ambos formularios
     loginForm.classList.add('hidden');
     registroForm.classList.add('hidden');
-
-    // Remover clase active de todas las pestañas
     tabs.forEach(t => t.classList.remove('active'));
 
-    // Mostrar el formulario correspondiente
     if (tab === 'login') {
         loginForm.classList.remove('hidden');
         tabs[0].classList.add('active');
@@ -24,7 +35,6 @@ function cambiarAuthTab(tab) {
         tabs[1].classList.add('active');
     }
 
-    // Limpiar mensajes
     document.getElementById('mensaje-auth').innerHTML = '';
 }
 
@@ -33,23 +43,43 @@ async function login() {
     const email = document.getElementById('login-email').value;
     const password = document.getElementById('login-password').value;
 
+    if (!email || !password) {
+        mostrarMensaje('mensaje-auth', 'Email y contraseña requeridos', 'error');
+        return;
+    }
+
     try {
         const response = await fetch(`${API_URL}/login.php`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include', // ✅ Enviar cookies de sesión
             body: JSON.stringify({ email, password })
         });
 
-        const data = await response.json();
+        // ✅ Verificar que la respuesta sea JSON válido antes de parsear
+        const text = await response.text();
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            console.error('Respuesta no es JSON:', text);
+            mostrarMensaje('mensaje-auth', 'Error del servidor (respuesta inválida)', 'error');
+            return;
+        }
 
-        if (response.ok) {
+        console.log('Respuesta login:', data); // ✅ Para debug
+
+        if (response.ok && data.usuario && data.usuario.id) {
             usuarioActual = data.usuario;
+            // ✅ Guardar en localStorage para persistencia
+            localStorage.setItem('usuarioActual', JSON.stringify(usuarioActual));
             mostrarMensaje('mensaje-auth', 'Login exitoso', 'exito');
             mostrarApp();
         } else {
-            mostrarMensaje('mensaje-auth', data.error, 'error');
+            mostrarMensaje('mensaje-auth', data.error || 'Error al iniciar sesión', 'error');
         }
     } catch (error) {
+        console.error('Error login:', error);
         mostrarMensaje('mensaje-auth', 'Error de conexión: ' + error.message, 'error');
     }
 }
@@ -76,23 +106,26 @@ async function registrar() {
             body: JSON.stringify({ nombre, email, password })
         });
 
-        const data = await response.json();
+        const text = await response.text();
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            mostrarMensaje('mensaje-auth', 'Error del servidor (respuesta inválida)', 'error');
+            return;
+        }
 
         if (response.ok) {
             mostrarMensaje('mensaje-auth', '✅ ¡Cuenta creada! Ahora puedes iniciar sesión.', 'exito');
-            // Limpiar campos
             document.getElementById('registro-nombre').value = '';
             document.getElementById('registro-email').value = '';
             document.getElementById('registro-password').value = '';
-            
-            // Cambiar a la pestaña de login después de 2 segundos
             setTimeout(() => {
                 cambiarAuthTab('login');
-                // Pre-llenar el email en el login
                 document.getElementById('login-email').value = email;
             }, 2000);
         } else {
-            mostrarMensaje('mensaje-auth', data.error, 'error');
+            mostrarMensaje('mensaje-auth', data.error || 'Error al registrar', 'error');
         }
     } catch (error) {
         mostrarMensaje('mensaje-auth', 'Error de conexión: ' + error.message, 'error');
@@ -101,11 +134,18 @@ async function registrar() {
 
 function logout() {
     usuarioActual = null;
+    // ✅ Limpiar localStorage al cerrar sesión
+    localStorage.removeItem('usuarioActual');
     document.getElementById('auth-container').classList.remove('hidden');
     document.getElementById('app-container').classList.add('hidden');
 }
 
 function mostrarApp() {
+    // ✅ Verificar que usuarioActual existe antes de usarlo
+    if (!usuarioActual || !usuarioActual.id) {
+        console.error('usuarioActual no válido:', usuarioActual);
+        return;
+    }
     document.getElementById('auth-container').classList.add('hidden');
     document.getElementById('app-container').classList.remove('hidden');
     document.getElementById('user-name').textContent = usuarioActual.nombre;
@@ -114,9 +154,27 @@ function mostrarApp() {
 
 // Funciones de tareas
 async function cargarTareas() {
+    // ✅ Guard: verificar que el usuario esté logueado
+    if (!usuarioActual || !usuarioActual.id) {
+        mostrarMensaje('mensaje-tareas', 'Sesión expirada. Por favor inicia sesión nuevamente.', 'error');
+        logout();
+        return;
+    }
+
     try {
-        const response = await fetch(`${API_URL}/tareas.php?usuario_id=${usuarioActual.id}`);
-        const data = await response.json();
+        const response = await fetch(`${API_URL}/tareas.php?usuario_id=${usuarioActual.id}`, {
+            credentials: 'include'
+        });
+
+        const text = await response.text();
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            console.error('Respuesta tareas no es JSON:', text);
+            mostrarMensaje('mensaje-tareas', 'Error del servidor al cargar tareas', 'error');
+            return;
+        }
 
         const listaTareas = document.getElementById('lista-tareas');
         listaTareas.innerHTML = '';
@@ -149,6 +207,13 @@ async function cargarTareas() {
 }
 
 async function crearTarea() {
+    // ✅ Guard: verificar que el usuario esté logueado
+    if (!usuarioActual || !usuarioActual.id) {
+        mostrarMensaje('mensaje-tareas', 'Error: debes iniciar sesión primero', 'error');
+        logout();
+        return;
+    }
+
     const titulo = document.getElementById('tarea-titulo').value;
     const descripcion = document.getElementById('tarea-descripcion').value;
     const prioridad = document.getElementById('tarea-prioridad').value;
@@ -163,6 +228,7 @@ async function crearTarea() {
         const response = await fetch(`${API_URL}/tareas.php`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({
                 usuario_id: usuarioActual.id,
                 titulo,
@@ -172,16 +238,23 @@ async function crearTarea() {
             })
         });
 
-        const data = await response.json();
+        const text = await response.text();
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            console.error('Respuesta crear tarea no es JSON:', text);
+            mostrarMensaje('mensaje-tareas', 'Error del servidor (respuesta inválida)', 'error');
+            return;
+        }
 
         if (response.ok) {
-            mostrarMensaje('mensaje-tareas', 'Tarea creada exitosamente', 'exito');
-            // Limpiar formulario
+            mostrarMensaje('mensaje-tareas', '✅ Tarea creada exitosamente', 'exito');
             document.getElementById('tarea-titulo').value = '';
             document.getElementById('tarea-descripcion').value = '';
             cargarTareas();
         } else {
-            mostrarMensaje('mensaje-tareas', data.error, 'error');
+            mostrarMensaje('mensaje-tareas', data.error || 'Error al crear tarea', 'error');
         }
     } catch (error) {
         mostrarMensaje('mensaje-tareas', 'Error de conexión: ' + error.message, 'error');
@@ -189,25 +262,39 @@ async function crearTarea() {
 }
 
 async function eliminarTarea(id) {
+    if (!usuarioActual || !usuarioActual.id) {
+        mostrarMensaje('mensaje-tareas', 'Error: sesión expirada', 'error');
+        logout();
+        return;
+    }
+
     if (!confirm('¿Estás seguro de eliminar esta tarea?')) return;
 
     try {
         const response = await fetch(`${API_URL}/tareas.php`, {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({
                 id: id,
                 usuario_id: usuarioActual.id
             })
         });
 
-        const data = await response.json();
+        const text = await response.text();
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            mostrarMensaje('mensaje-tareas', 'Error del servidor', 'error');
+            return;
+        }
 
         if (response.ok) {
             mostrarMensaje('mensaje-tareas', 'Tarea eliminada', 'exito');
             cargarTareas();
         } else {
-            mostrarMensaje('mensaje-tareas', data.error, 'error');
+            mostrarMensaje('mensaje-tareas', data.error || 'Error al eliminar', 'error');
         }
     } catch (error) {
         mostrarMensaje('mensaje-tareas', 'Error de conexión: ' + error.message, 'error');
@@ -217,30 +304,29 @@ async function eliminarTarea(id) {
 // Variable para guardar el ID de la tarea que se está editando
 let tareaEditandoId = null;
 
-// Función para abrir el modal y cargar datos de la tarea
 function editarTarea(id, titulo, descripcion, prioridad, estado) {
     tareaEditandoId = id;
-    
-    // Llenar los campos del modal con los datos actuales
     document.getElementById('editar-titulo').value = titulo;
     document.getElementById('editar-descripcion').value = descripcion;
     document.getElementById('editar-prioridad').value = prioridad;
     document.getElementById('editar-estado').value = estado;
-    
-    // Mostrar el modal
     document.getElementById('modal-editar').classList.add('show');
 }
 
-// Función para cerrar el modal
 function cerrarModal() {
     document.getElementById('modal-editar').classList.remove('show');
     tareaEditandoId = null;
 }
 
-// Función para guardar los cambios de la edición
 async function guardarEdicion() {
     if (!tareaEditandoId) return;
-    
+
+    if (!usuarioActual || !usuarioActual.id) {
+        alert('Sesión expirada. Por favor inicia sesión nuevamente.');
+        logout();
+        return;
+    }
+
     const titulo = document.getElementById('editar-titulo').value;
     const descripcion = document.getElementById('editar-descripcion').value;
     const prioridad = document.getElementById('editar-prioridad').value;
@@ -255,6 +341,7 @@ async function guardarEdicion() {
         const response = await fetch(`${API_URL}/tareas.php`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({
                 id: tareaEditandoId,
                 usuario_id: usuarioActual.id,
@@ -265,14 +352,21 @@ async function guardarEdicion() {
             })
         });
 
-        const data = await response.json();
+        const text = await response.text();
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            alert('Error del servidor (respuesta inválida)');
+            return;
+        }
 
         if (response.ok) {
             mostrarMensaje('mensaje-tareas', '✅ Tarea actualizada exitosamente', 'exito');
             cerrarModal();
             cargarTareas();
         } else {
-            alert(data.error);
+            alert(data.error || 'Error al actualizar');
         }
     } catch (error) {
         alert('Error de conexión: ' + error.message);
@@ -281,9 +375,20 @@ async function guardarEdicion() {
 
 // Funciones de estadísticas
 async function cargarEstadisticas() {
+    if (!usuarioActual || !usuarioActual.id) return;
+
     try {
-        const response = await fetch(`${API_URL}/estadisticas.php?usuario_id=${usuarioActual.id}`);
-        const data = await response.json();
+        const response = await fetch(`${API_URL}/estadisticas.php?usuario_id=${usuarioActual.id}`, {
+            credentials: 'include'
+        });
+        const text = await response.text();
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            console.error('Error parseando estadísticas:', text);
+            return;
+        }
 
         if (response.ok) {
             const statsGrid = document.getElementById('stats-grid');
@@ -326,10 +431,10 @@ async function cargarEstadisticas() {
     }
 }
 
-// Función para consultar clima (API externa)
+// Función para consultar clima
 async function consultarClima() {
     const ciudad = document.getElementById('ciudad-input').value;
-    
+
     if (!ciudad) {
         alert('Ingresa una ciudad');
         return;
@@ -337,7 +442,14 @@ async function consultarClima() {
 
     try {
         const response = await fetch(`${API_URL}/clima.php?ciudad=${encodeURIComponent(ciudad)}`);
-        const data = await response.json();
+        const text = await response.text();
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            document.getElementById('resultado-clima').innerHTML = `<div class="mensaje error">Error del servidor</div>`;
+            return;
+        }
 
         if (response.ok) {
             document.getElementById('resultado-clima').innerHTML = `
@@ -351,32 +463,24 @@ async function consultarClima() {
                 </div>
             `;
         } else {
-            document.getElementById('resultado-clima').innerHTML = `
-                <div class="mensaje error">${data.error}</div>
-            `;
+            document.getElementById('resultado-clima').innerHTML = `<div class="mensaje error">${data.error}</div>`;
         }
     } catch (error) {
-        document.getElementById('resultado-clima').innerHTML = `
-            <div class="mensaje error">Error de conexión: ${error.message}</div>
-        `;
+        document.getElementById('resultado-clima').innerHTML = `<div class="mensaje error">Error de conexión: ${error.message}</div>`;
     }
 }
 
 // Función para cambiar tabs
 function cambiarTab(tab) {
-    // Ocultar todos los tabs
     document.getElementById('tab-tareas').classList.add('hidden');
     document.getElementById('tab-estadisticas').classList.add('hidden');
     document.getElementById('tab-clima').classList.add('hidden');
 
-    // Desactivar todos los botones
     document.querySelectorAll('.tab').forEach(btn => btn.classList.remove('active'));
 
-    // Mostrar tab seleccionado
     document.getElementById(`tab-${tab}`).classList.remove('hidden');
     event.target.classList.add('active');
 
-    // Cargar datos según el tab
     if (tab === 'tareas') {
         cargarTareas();
     } else if (tab === 'estadisticas') {
@@ -387,6 +491,7 @@ function cambiarTab(tab) {
 // Función auxiliar para mostrar mensajes
 function mostrarMensaje(elementoId, mensaje, tipo) {
     const elemento = document.getElementById(elementoId);
+    if (!elemento) return;
     elemento.innerHTML = `<div class="mensaje ${tipo}">${mensaje}</div>`;
     setTimeout(() => {
         elemento.innerHTML = '';
