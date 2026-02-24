@@ -7,38 +7,29 @@
  * Previene múltiples conexiones y asegura configuración única
  * =================================================================
  */
-
 class Database {
     private static $instance = null;
     private $conn;
     
     // Configuración con variables de entorno (Railway/Producción)
     private $host;
+    private $port;
     private $db_name;
     private $username;
     private $password;
 
     private function __construct() {
-        /**
-         * =============================================================
-         * PROBLEMA 2 - FALLAS CRIPTOGRÁFICAS: SOLUCIONADO ✅
-         * =============================================================
-         * No guardar credenciales en código
-         * Usar variables de entorno en producción
-         * =============================================================
-         */
-        // Leer variables de entorno de Railway
-        $this->host = getenv('MYSQLHOST') ?: getenv('MYSQL_HOST') ?: "mysql.railway.internal";
-        $this->username = getenv('MYSQLUSER') ?: getenv('MYSQL_USER') ?: "root";
-        $this->password = getenv('MYSQLPASSWORD') ?: getenv('MYSQL_PASSWORD') ?: "";
+
+        // Obtener variables de entorno (compatibles con Railway)
+        $this->host = getenv('MYSQL_HOST') ?: getenv('MYSQLHOST') ?: "db";
+        $this->port = getenv('MYSQL_PORT') ?: getenv('MYSQLPORT') ?: "3306";
+        $this->db_name = getenv('MYSQL_DATABASE') ?: getenv('MYSQLDATABASE') ?: "proyecto_db";
+        $this->username = getenv('MYSQL_USER') ?: getenv('MYSQLUSER') ?: "usuario";
+        $this->password = getenv('MYSQL_PASSWORD') ?: getenv('MYSQLPASSWORD') ?: "password123";
         
-        // SIEMPRE usar proyecto_db donde importamos init.sql
-        $this->db_name = "proyecto_db";
-        
-        // Si hay MYSQL_URL, parsear pero mantener proyecto_db
+        // Railway a veces usa MYSQL_URL completa
         if (getenv('MYSQL_URL')) {
             $this->parseConnectionUrl(getenv('MYSQL_URL'));
-            $this->db_name = "proyecto_db"; // Siempre proyecto_db
         }
     }
 
@@ -62,33 +53,26 @@ class Database {
         }
     }
 
-    public function getConnection() {
-        if ($this->conn === null) {
-            try {
-                $this->conn = new PDO(
-                    "mysql:host=" . $this->host . ";dbname=" . $this->db_name . ";charset=utf8mb4",
-                    $this->username,
-                    $this->password,
-                    [
-                        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                        PDO::ATTR_EMULATE_PREPARES => false,
-                    ]
-                );
-            } catch(PDOException $exception) {
-                /**
-                 * =============================================================
-                 * PROBLEMA 3 - DISEÑO INSEGURO: SOLUCIONADO ✅
-                 * =============================================================
-                 * No revelar detalles de errores en producción
-                 * =============================================================
-                 */
-                error_log("Error de conexión DB: " . $exception->getMessage());
-                die(json_encode(['error' => 'Error de conexión al servidor']));
-            }
+   public function getConnection() {
+    if ($this->conn === null) {
+        try {
+            $this->conn = new PDO(
+                "mysql:host={$this->host};port={$this->port};dbname={$this->db_name};charset=utf8mb4",
+                $this->username,
+                $this->password,
+                [
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                    PDO::ATTR_EMULATE_PREPARES => false,
+                ]
+            );
+        } catch(PDOException $exception) {
+            error_log("Error de conexión DB: " . $exception->getMessage());
+            die(json_encode(['error' => 'Error de conexión al servidor']));
         }
-        return $this->conn;
     }
+    return $this->conn;
+}
 
     // Prevenir clonación de la instancia
     private function __clone() {}
