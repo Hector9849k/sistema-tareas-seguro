@@ -44,6 +44,7 @@ async function login() {
 
         if (response.ok) {
             usuarioActual = data;
+            localStorage.setItem('usuario', JSON.stringify(data));
             mostrarMensaje('mensaje-auth', 'Login exitoso', 'exito');
             mostrarApp();
         } else {
@@ -101,6 +102,7 @@ async function registrar() {
 
 function logout() {
     usuarioActual = null;
+    localStorage.removeItem('usuario');
     document.getElementById('auth-container').classList.remove('hidden');
     document.getElementById('app-container').classList.add('hidden');
 }
@@ -108,7 +110,7 @@ function logout() {
 function mostrarApp() {
     document.getElementById('auth-container').classList.add('hidden');
     document.getElementById('app-container').classList.remove('hidden');
-    document.getElementById('user-name').textContent = usuarioActual.nombre;
+    document.getElementById('user-name').textContent = usuarioActual.nombre || usuarioActual.email;
     cargarTareas();
 }
 
@@ -116,27 +118,25 @@ function mostrarApp() {
 async function cargarTareas() {
     try {
         const response = await fetch(`${API_URL}/tareas.php?usuario_id=${usuarioActual.usuario_id}`);
-        const data = await response.json();
+        const tareas = await response.json();
 
         const listaTareas = document.getElementById('lista-tareas');
         listaTareas.innerHTML = '';
 
-        if (data.tareas && data.tareas.length > 0) {
-            data.tareas.forEach(tarea => {
+        if (Array.isArray(tareas) && tareas.length > 0) {
+            tareas.forEach(tarea => {
                 listaTareas.innerHTML += `
-                    <div class="task-item ${tarea.prioridad}">
+                    <div class="task-item">
                         <div class="task-header">
                             <div>
                                 <strong>${tarea.titulo}</strong>
-                                <span class="badge ${tarea.estado}">${tarea.estado.replace('_', ' ')}</span>
                             </div>
                             <div class="task-actions" style="display: flex; flex-direction: column; gap: 5px;">
                                 <button onclick="eliminarTarea(${tarea.id})" class="danger">🗑️ Eliminar</button>
-                                <button onclick="editarTarea(${tarea.id}, '${tarea.titulo.replace(/'/g, "\\'")}', '${(tarea.descripcion || '').replace(/'/g, "\\'")}', '${tarea.prioridad}', '${tarea.estado}')" class="secondary">✏️ Editar</button>
                             </div>
                         </div>
                         <p>${tarea.descripcion || 'Sin descripción'}</p>
-                        <small>Prioridad: ${tarea.prioridad} | Creada: ${tarea.fecha_creacion}</small>
+                        <small>Creada: ${tarea.fecha_creacion}</small>
                     </div>
                 `;
             });
@@ -151,8 +151,6 @@ async function cargarTareas() {
 async function crearTarea() {
     const titulo = document.getElementById('tarea-titulo').value;
     const descripcion = document.getElementById('tarea-descripcion').value;
-    const prioridad = document.getElementById('tarea-prioridad').value;
-    const estado = document.getElementById('tarea-estado').value;
 
     if (!titulo) {
         mostrarMensaje('mensaje-tareas', 'El título es requerido', 'error');
@@ -166,9 +164,7 @@ async function crearTarea() {
             body: JSON.stringify({
                 usuario_id: usuarioActual.usuario_id,
                 titulo,
-                descripcion,
-                prioridad,
-                estado
+                descripcion
             })
         });
 
@@ -192,13 +188,8 @@ async function eliminarTarea(id) {
     if (!confirm('¿Estás seguro de eliminar esta tarea?')) return;
 
     try {
-        const response = await fetch(`${API_URL}/tareas.php`, {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                id: id,
-                usuario_id: usuarioActual.usuario_id
-            })
+        const response = await fetch(`${API_URL}/tareas.php?id=${id}`, {
+            method: 'DELETE'
         });
 
         const data = await response.json();
@@ -214,151 +205,39 @@ async function eliminarTarea(id) {
     }
 }
 
-// Variable para guardar el ID de la tarea que se está editando
-let tareaEditandoId = null;
-
-// Función para abrir el modal y cargar datos de la tarea
-function editarTarea(id, titulo, descripcion, prioridad, estado) {
-    tareaEditandoId = id;
-    
-    // Llenar los campos del modal con los datos actuales
-    document.getElementById('editar-titulo').value = titulo;
-    document.getElementById('editar-descripcion').value = descripcion;
-    document.getElementById('editar-prioridad').value = prioridad;
-    document.getElementById('editar-estado').value = estado;
-    
-    // Mostrar el modal
-    document.getElementById('modal-editar').classList.add('show');
-}
-
-// Función para cerrar el modal
-function cerrarModal() {
-    document.getElementById('modal-editar').classList.remove('show');
-    tareaEditandoId = null;
-}
-
-// Función para guardar los cambios de la edición
-async function guardarEdicion() {
-    if (!tareaEditandoId) return;
-    
-    const titulo = document.getElementById('editar-titulo').value;
-    const descripcion = document.getElementById('editar-descripcion').value;
-    const prioridad = document.getElementById('editar-prioridad').value;
-    const estado = document.getElementById('editar-estado').value;
-
-    if (!titulo) {
-        alert('El título es requerido');
-        return;
-    }
-
-    try {
-        const response = await fetch(`${API_URL}/tareas.php`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                id: tareaEditandoId,
-                usuario_id: usuarioActual.usuario_id,
-                titulo,
-                descripcion,
-                prioridad,
-                estado
-            })
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
-            mostrarMensaje('mensaje-tareas', '✅ Tarea actualizada exitosamente', 'exito');
-            cerrarModal();
-            cargarTareas();
-        } else {
-            alert(data.error);
-        }
-    } catch (error) {
-        alert('Error de conexión: ' + error.message);
-    }
-}
-
 // Funciones de estadísticas
 async function cargarEstadisticas() {
     try {
-        const response = await fetch(`${API_URL}/estadisticas.php?usuario_id=${usuarioActual.usuario_id}`);
-        const data = await response.json();
+        const response = await fetch(`${API_URL}/tareas.php?usuario_id=${usuarioActual.usuario_id}`);
+        const tareas = await response.json();
 
-        if (response.ok) {
-            const statsGrid = document.getElementById('stats-grid');
-            statsGrid.innerHTML = `
-                <div class="stat-card">
-                    <div>Total de Tareas</div>
-                    <div class="stat-value">${data.estadisticas.total_tareas}</div>
-                </div>
-                <div class="stat-card">
-                    <div>Pendientes</div>
-                    <div class="stat-value">${data.estadisticas.pendientes}</div>
-                </div>
-                <div class="stat-card">
-                    <div>En Progreso</div>
-                    <div class="stat-value">${data.estadisticas.en_progreso}</div>
-                </div>
-                <div class="stat-card">
-                    <div>Completadas</div>
-                    <div class="stat-value">${data.estadisticas.completadas}</div>
-                </div>
-                <div class="stat-card">
-                    <div>% Completadas</div>
-                    <div class="stat-value">${data.estadisticas.porcentaje_completadas}%</div>
-                </div>
-            `;
+        if (!Array.isArray(tareas)) tareas = [];
 
-            const listaActividades = document.getElementById('lista-actividades');
-            listaActividades.innerHTML = '';
-            data.actividades_recientes.forEach(act => {
-                listaActividades.innerHTML += `
-                    <div class="task-item">
-                        <strong>${act.accion}</strong>: ${act.detalles || 'Sin detalles'}
-                        <br><small>${act.fecha}</small>
-                    </div>
-                `;
-            });
-        }
+        const total = tareas.length;
+        const completadas = tareas.filter(t => t.completada == 1).length;
+        const porcentaje = total > 0 ? Math.round((completadas / total) * 100) : 0;
+
+        const statsGrid = document.getElementById('stats-grid');
+        statsGrid.innerHTML = `
+            <div class="stat-card">
+                <div>Total de Tareas</div>
+                <div class="stat-value">${total}</div>
+            </div>
+            <div class="stat-card">
+                <div>Completadas</div>
+                <div class="stat-value">${completadas}</div>
+            </div>
+            <div class="stat-card">
+                <div>Pendientes</div>
+                <div class="stat-value">${total - completadas}</div>
+            </div>
+            <div class="stat-card">
+                <div>% Completadas</div>
+                <div class="stat-value">${porcentaje}%</div>
+            </div>
+        `;
     } catch (error) {
         console.error('Error al cargar estadísticas:', error);
-    }
-}
-
-// Función para consultar clima (API externa)
-async function consultarClima() {
-    const ciudad = document.getElementById('ciudad-input').value;
-    
-    if (!ciudad) {
-        alert('Ingresa una ciudad');
-        return;
-    }
-
-    try {
-        const response = await fetch(`${API_URL}/clima.php?ciudad=${encodeURIComponent(ciudad)}`);
-        const data = await response.json();
-
-        if (response.ok) {
-            document.getElementById('resultado-clima').innerHTML = `
-                <div class="weather-card">
-                    <h3>🌍 ${data.ciudad}</h3>
-                    <div class="stat-value">${data.temperatura}</div>
-                    <p><strong>Descripción:</strong> ${data.descripcion}</p>
-                    <p><strong>Humedad:</strong> ${data.humedad}</p>
-                    <p><strong>Viento:</strong> ${data.velocidad_viento}</p>
-                    <p><small>Última actualización: ${data.fecha_hora}</small></p>
-                </div>
-            `;
-        } else {
-            document.getElementById('resultado-clima').innerHTML = `
-                <div class="mensaje error">${data.error}</div>
-            `;
-        }
-    } catch (error) {
-        document.getElementById('resultado-clima').innerHTML = `
-            <div class="mensaje error">Error de conexión: ${error.message}</div>
-        `;
     }
 }
 
@@ -367,7 +246,6 @@ function cambiarTab(tab) {
     // Ocultar todos los tabs
     document.getElementById('tab-tareas').classList.add('hidden');
     document.getElementById('tab-estadisticas').classList.add('hidden');
-    document.getElementById('tab-clima').classList.add('hidden');
 
     // Desactivar todos los botones
     document.querySelectorAll('.tab').forEach(btn => btn.classList.remove('active'));
@@ -392,3 +270,18 @@ function mostrarMensaje(elementoId, mensaje, tipo) {
         elemento.innerHTML = '';
     }, 5000);
 }
+
+// Inicialización
+document.addEventListener('DOMContentLoaded', function() {
+    // Verificar si hay usuario guardado
+    const usuarioGuardado = localStorage.getItem('usuario');
+    if (usuarioGuardado) {
+        try {
+            usuarioActual = JSON.parse(usuarioGuardado);
+            mostrarApp();
+        } catch (error) {
+            console.error('Error al recuperar usuario:', error);
+            localStorage.removeItem('usuario');
+        }
+    }
+});
