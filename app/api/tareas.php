@@ -34,42 +34,63 @@ try {
         sendResponse(200, ['tareas' => $tareas]);
     }
 
-    // CREAR TAREA (POST)
-    if ($metodo === 'POST') {
-        $data = json_decode(file_get_contents("php://input"));
+   // CREAR TAREA (POST)
+if ($metodo === 'POST') {
+    $data = json_decode(file_get_contents("php://input"));
 
-        if (empty($data->usuario_id) || empty($data->titulo)) {
-            sendResponse(400, ['error' => 'Usuario ID y título requeridos']);
-        }
+    if (!$data || empty($data->usuario_id) || empty($data->titulo)) {
+        sendResponse(400, ['error' => 'Usuario ID y título requeridos']);
+    }
 
-        $query = "INSERT INTO tareas (usuario_id, titulo, descripcion, prioridad, estado) 
+    try {
+
+        $query = "INSERT INTO tareas 
+                  (usuario_id, titulo, descripcion, prioridad, estado) 
                   VALUES (:usuario_id, :titulo, :descripcion, :prioridad, :estado)";
+
         $stmt = $db->prepare($query);
 
         $stmt->bindParam(":usuario_id", $data->usuario_id);
         $stmt->bindParam(":titulo", $data->titulo);
-        $stmt->bindParam(":descripcion", $data->descripcion ?? '');
-        $stmt->bindParam(":prioridad", $data->prioridad ?? 'media');
-        $stmt->bindParam(":estado", $data->estado ?? 'pendiente');
+        $stmt->bindParam(":descripcion", $data->descripcion);
+        $stmt->bindParam(":prioridad", $data->prioridad);
+        $stmt->bindParam(":estado", $data->estado);
 
-        if ($stmt->execute()) {
+        $stmt->execute();
+
+        $tarea_id = $db->lastInsertId();
+
+        // Intentar log (pero no fallar si no existe la tabla)
+        try {
             $log_query = "INSERT INTO actividades (usuario_id, accion, detalles) 
                           VALUES (:usuario_id, 'crear_tarea', :detalles)";
             $log_stmt = $db->prepare($log_query);
+
             $detalles = "Tarea creada: " . $data->titulo;
+
             $log_stmt->bindParam(":usuario_id", $data->usuario_id);
             $log_stmt->bindParam(":detalles", $detalles);
             $log_stmt->execute();
 
-            sendResponse(201, [
-                'mensaje' => 'Tarea creada exitosamente',
-                'tarea_id' => $db->lastInsertId()
-            ]);
-        } else {
-            sendResponse(500, ['error' => 'Error al crear tarea']);
+        } catch (Exception $e) {
+            error_log("Tabla actividades no existe o error log: " . $e->getMessage());
         }
-    }
 
+        sendResponse(201, [
+            'mensaje' => 'Tarea creada exitosamente',
+            'tarea_id' => $tarea_id
+        ]);
+
+    } catch (PDOException $e) {
+
+        error_log("Error al crear tarea: " . $e->getMessage());
+
+        sendResponse(500, [
+            'error' => 'Error al crear tarea',
+            'detalle' => $e->getMessage()
+        ]);
+    }
+}
     // ACTUALIZAR TAREA (PUT)
     if ($metodo === 'PUT') {
         $data = json_decode(file_get_contents("php://input"));
