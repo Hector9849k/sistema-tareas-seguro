@@ -27,14 +27,17 @@ class Database {
          * Usar variables de entorno en producción
          * =============================================================
          */
-        $this->host = getenv('MYSQL_HOST') ?: getenv('MYSQLHOST') ?: "db";
-        $this->db_name = getenv('MYSQL_DATABASE') ?: getenv('MYSQLDATABASE') ?: "proyecto_db";
-        $this->username = getenv('MYSQL_USER') ?: getenv('MYSQLUSER') ?: "usuario";
-        $this->password = getenv('MYSQL_PASSWORD') ?: getenv('MYSQLPASSWORD') ?: "password123";
+        // CORREGIDO: Usar "proyecto_db" directamente (donde está el init.sql)
+        $this->host = getenv('MYSQL_HOST') ?: getenv('MYSQLHOST') ?: "mysql.railway.internal";
+        $this->db_name = "proyecto_db"; // ✅ FORZAMOS proyecto_db
+        $this->username = getenv('MYSQL_USER') ?: getenv('MYSQLUSER') ?: "root";
+        $this->password = getenv('MYSQL_PASSWORD') ?: getenv('MYSQLPASSWORD') ?: "";
         
         // Railway a veces usa MYSQL_URL completa
         if (getenv('MYSQL_URL')) {
             $this->parseConnectionUrl(getenv('MYSQL_URL'));
+            // Pero SIEMPRE usar proyecto_db
+            $this->db_name = "proyecto_db";
         }
     }
 
@@ -54,7 +57,7 @@ class Database {
             $this->host = $parts['host'] ?? $this->host;
             $this->username = $parts['user'] ?? $this->username;
             $this->password = $parts['pass'] ?? $this->password;
-            $this->db_name = ltrim($parts['path'], '/') ?? $this->db_name;
+            // NO cambiar db_name aquí, siempre usar proyecto_db
         }
     }
 
