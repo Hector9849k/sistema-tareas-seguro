@@ -1,4 +1,12 @@
 <?php
+ini_set('display_errors', 0);
+set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    error_log("Error [$errno]: $errstr en $errfile:$errline");
+    http_response_code(500);
+    echo json_encode(['error' => 'Error del servidor']);
+    exit;
+});
+
 require_once '../config/database.php';
 
 setCorsHeaders();
@@ -10,14 +18,13 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 $ciudad = isset($_GET['ciudad']) ? $_GET['ciudad'] : 'London';
 
 try {
-    // API gratuita de Open-Meteo (no requiere API key)
-    // Primero obtenemos las coordenadas de la ciudad usando Nominatim
     $geocode_url = "https://nominatim.openstreetmap.org/search?q=" . urlencode($ciudad) . "&format=json&limit=1";
     
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $geocode_url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_USERAGENT, 'ProyectoWeb/1.0');
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
     $geocode_response = curl_exec($ch);
     curl_close($ch);
 
@@ -31,18 +38,21 @@ try {
     $lon = $geocode_data[0]['lon'];
     $nombre_ciudad = $geocode_data[0]['display_name'];
 
-    // Ahora obtenemos el clima usando Open-Meteo
     $weather_url = "https://api.open-meteo.com/v1/forecast?latitude={$lat}&longitude={$lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&timezone=auto";
     
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $weather_url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
     $weather_response = curl_exec($ch);
     curl_close($ch);
 
     $weather_data = json_decode($weather_response, true);
 
-    // Interpretar código de clima
+    if (empty($weather_data) || empty($weather_data['current'])) {
+        sendResponse(500, ['error' => 'No se pudo obtener datos del clima']);
+    }
+
     $weather_code = $weather_data['current']['weather_code'];
     $descripcion = obtenerDescripcionClima($weather_code);
 
@@ -56,7 +66,8 @@ try {
     ]);
 
 } catch(Exception $e) {
-    sendResponse(500, ['error' => 'Error al obtener datos del clima: ' . $e->getMessage()]);
+    error_log("Error al obtener clima: " . $e->getMessage());
+    sendResponse(500, ['error' => 'Error al obtener datos del clima']);
 }
 
 function obtenerDescripcionClima($code) {
