@@ -1,5 +1,6 @@
-
 <?php
+// IMPORTANTE: Este archivo debe guardarse como UTF-8 SIN BOM
+// No debe haber ningún caracter antes de <?php
 class Database {
     private static $instance = null;
     private $conn;
@@ -167,4 +168,3 @@ function verificarRateLimit($identificador, $max_intentos = 5, $ventana = 300) {
     $_SESSION[$key]['count']++;
     return true;
 }
-?>
