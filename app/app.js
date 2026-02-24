@@ -1,6 +1,6 @@
 // Variables globales
 let usuarioActual = null;
-const API_URL = 'http://localhost:8080/api';
+const API_URL = 'https://sistema-tareas-seguro-production.up.railway.app/api';
 
 // Función para cambiar entre Login y Registro
 function cambiarAuthTab(tab) {
