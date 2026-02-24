@@ -1,42 +1,32 @@
-FROM php:8.2-fpm
+FROM php:8.2-fpm-alpine
 
-# Instalar extensiones necesarias para MySQL
+# Instalar dependencias
+RUN apk add --no-cache \
+    nginx \
+    mysql-client \
+    curl \
+    git
+
+# Instalar extensión PDO MySQL
 RUN docker-php-ext-install pdo pdo_mysql
 
-FROM php:8.2-fpm
+# Copiar archivos de la aplicación
+COPY app /var/www/html/app
+COPY app/index.html /var/www/html/index.html
+COPY nginx.conf /etc/nginx/http.d/default.conf
 
-# Instalar extensiones necesarias para MySQL
-RUN docker-php-ext-install pdo pdo_mysql
+# Crear directorio para logs de Nginx
+RUN mkdir -p /var/log/nginx && \
+    chown -R www-data:www-data /var/www/html
 
-# Instalar Nginx
-RUN apt-get update && apt-get install -y nginx && rm -rf /var/lib/apt/lists/*
+# Configurar PHP-FPM para escuchar en TCP (no socket)
+RUN echo "listen = 127.0.0.1:9000" > /usr/local/etc/php-fpm.d/zz-docker.conf && \
+    echo "listen.allowed_clients = 127.0.0.1" >> /usr/local/etc/php-fpm.d/zz-docker.conf
 
-# Crear directorio para socket
-RUN mkdir -p /var/run/php-fpm && chown -R www-data:www-data /var/run/php-fpm
-
-# Configurar PHP-FPM para usar socket Unix
-RUN sed -i 's|listen = 127.0.0.1:9000|listen = /var/run/php-fpm/php-fpm.sock|' /usr/local/etc/php-fpm.d/www.conf && \
-    sed -i 's|;listen.owner = nobody|listen.owner = www-data|' /usr/local/etc/php-fpm.d/www.conf && \
-    sed -i 's|;listen.group = nobody|listen.group = www-data|' /usr/local/etc/php-fpm.d/www.conf && \
-    sed -i 's|;listen.mode = 0660|listen.mode = 0660|' /usr/local/etc/php-fpm.d/www.conf
-
-# Copiar aplicación
-COPY ./app /var/www/html/
-
-# Permisos correctos
-RUN chown -R www-data:www-data /var/www/html
-RUN chmod -R 755 /var/www/html
-
-# Copiar configuración de Nginx
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-# Script para iniciar ambos servicios
-RUN echo '#!/bin/bash\n\
-mkdir -p /var/run/php-fpm\n\
-php-fpm -D\n\
-nginx -g "daemon off;"\n\
-' > /start.sh && chmod +x /start.sh
+# Script de inicio que corre Nginx y PHP-FPM
+RUN echo '#!/bin/sh\nphp-fpm &\nnginx -g "daemon off;"' > /entrypoint.sh && \
+    chmod +x /entrypoint.sh
 
 EXPOSE 80
 
-CMD ["/start.sh"]
+ENTRYPOINT ["/entrypoint.sh"]
